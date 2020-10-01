@@ -1,6 +1,6 @@
 {
-    "name": "Mumble Server",
-    "id": "mumbleserver",
+    "name": "Mumble Web",
+    "id": "mumbleweb",
     "packaging_format": 1,
     "description": {
         "en": "Mumble is a libre, low-latency, high quality voice chat software primarily intended for use while gaming.",
