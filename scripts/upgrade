@@ -238,7 +238,7 @@ systemctl disable mumble-server
 #=================================================
 
 # Add Mumble as a YunoHost service
-yunohost service add "$app" -l "/var/log/mumble-server/$app.log"
+yunohost service add "$app" --description "High quality voice chat software" --log "/var/log/mumble-server/$app.log"
 
 #=================================================
 # START SYSTEMD SERVICE

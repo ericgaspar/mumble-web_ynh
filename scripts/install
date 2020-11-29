@@ -74,7 +74,6 @@ ynh_app_setting_set "$app" port_web "$port_web"
 # Open port in firewall
 yunohost firewall allow Both "$port_web"
 
-
 #=================================================
 # INSTALL DEPENDENCIES
 #=================================================
@@ -92,7 +91,7 @@ ynh_script_progression --message="Setting up source files..." --weight=2
 
 ynh_app_setting_set --app=$app --key=final_path --value=$final_path
 
-git clone -b webrtc https://github.com/johni0702/mumble-web "$final_path" --quiet
+git clone https://github.com/johni0702/mumble-web "$final_path" --quiet
 
 #=================================================
 # NGINX CONFIGURATION
@@ -183,7 +182,7 @@ systemctl disable mumble-server
 #=================================================
 
 # Add Mumble as a YunoHost service
-yunohost service add "$app" -l "/var/log/mumble-server/$app.log"
+yunohost service add $app --description "High quality voice chat software" --log "/var/log/mumble-server/$app.log"
 
 systemctl restart "$app"
 
