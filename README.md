@@ -19,7 +19,7 @@ Quick description of this app.
 
 ## Demo
 
-* [Official demo](https://voice.johni0702.de/webrtc/?address=voice.johni0702.de&port=443/demo)
+* [Official demo](https://voice.johni0702.de/?address=voice.johni0702.de&port=443/demo)
 
 ## Configuration
 
@@ -54,7 +54,7 @@ How to configure this app: From an admin panel, a plain file with SSH, or any ot
 
  * Report a bug: https://github.com/YunoHost-Apps/mumble-web_ynh/issues
  * App website: https://mumble.info
- * Upstream app repository: https://github.com/Johni0702/mumble-web/tree/webrtc
+ * Upstream app repository: https://github.com/Johni0702/mumble-web
  * YunoHost website: https://yunohost.org/
 
 ---
