@@ -47,15 +47,15 @@ test ! -e "$final_path" || ynh_die "This path already contains a folder"
 #=================================================
 
 # Save app settings
-ynh_app_setting_set "$app" domain          "$domain"
-ynh_app_setting_set "$app" no_sso          "true"
-ynh_app_setting_set "$app" server_password "$server_password"
-ynh_app_setting_set "$app" su_passwd       "$su_passwd"
-ynh_app_setting_set "$app" welcometext     "$welcometext"
-ynh_app_setting_set "$app" registerName    "$registerName"
-ynh_app_setting_set "$app" instance_id     "$instance_id"
-ynh_app_setting_set "$app" mumbleweb       "$mumbleweb"
-ynh_app_setting_set "$app" is_public       "$is_public"
+ynh_app_setting_set --app=$app --key=domain          --value=$domain
+ynh_app_setting_set --app=$app --key=no_sso          --value=true
+ynh_app_setting_set --app=$app --key=server_password --value=$server_password
+ynh_app_setting_set --app=$app --key=su_passwd       --value=$su_passwd
+ynh_app_setting_set --app=$app --key=welcometext     --value=$welcometext
+ynh_app_setting_set --app=$app --key=registerName    --value=$registerName
+ynh_app_setting_set --app=$app --key=instance_id     --value=$instance_id
+ynh_app_setting_set --app=$app --key=mumbleweb       --value=$mumbleweb
+ynh_app_setting_set --app=$app --key=is_public       --value=$is_public
 
 #=================================================
 # STANDARD MODIFICATIONS
@@ -82,10 +82,8 @@ ynh_script_progression --message="Installing dependencies..." --weight=20
 
 ynh_install_app_dependencies $pkg_dependencies
 
-
 # Install Nodejs
 ynh_exec_warn_less ynh_install_nodejs --nodejs_version=$nodejs_version
-
 
 #=================================================
 # INSTALL Mumble-web
@@ -99,7 +97,7 @@ git clone -b webrtc https://github.com/johni0702/mumble-web "$final_path" --quie
 #=================================================
 # NGINX CONFIGURATION
 #=================================================
-ynh_script_progression --message="Configuring nginx web server..." --weight=1
+ynh_script_progression --message="Configuring NGINX web server..." --weight=1
 
 ynh_add_nginx_config
 
@@ -153,7 +151,6 @@ ynh_replace_string --match_string="__PORT_WEB__" --replace_string="$port_web" --
 
 ynh_add_systemd_config "$app-web" mumble-web.service
 
-
 #=================================================
 # GENERIC FINALIZATION
 #=================================================
@@ -193,7 +190,7 @@ systemctl restart "$app"
 #=================================================
 # SETUP SSOWAT
 #=================================================
-ynh_script_progression --message="Configuring SSOwat..." --time --weight=1
+ynh_script_progression --message="Configuring SSOwat..." --weight=1
 
 # Make app public if necessary
 if [ "$is_public" -eq 1 ]
@@ -205,7 +202,7 @@ fi
 #=================================================
 # RELOAD NGINX
 #=================================================
-ynh_script_progression --message="Reloading nginx web server..." --time --weight=1
+ynh_script_progression --message="Reloading NGINX web server..." --weight=1
 
 ynh_systemd_action --service_name=nginx --action=reload
 
@@ -230,9 +227,8 @@ Please open a new issue in this project: https://github.com/YunoHost-Apps/mumble
 "
 ynh_send_readme_to_admin "$message"
 
-
 #=================================================
 # END OF SCRIPT
 #=================================================
 
-ynh_script_progression --message="Installation of $app completed" --time --last
+ynh_script_progression --message="Installation of $app completed" --last

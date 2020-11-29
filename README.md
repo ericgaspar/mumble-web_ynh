@@ -1,7 +1,7 @@
 # Mumble web for YunoHost
 
-[![Integration level](https://dash.yunohost.org/integration/REPLACEBYYOURAPP.svg)](https://dash.yunohost.org/appci/app/REPLACEBYYOURAPP) ![](https://ci-apps.yunohost.org/ci/badges/REPLACEBYYOURAPP.status.svg) ![](https://ci-apps.yunohost.org/ci/badges/REPLACEBYYOURAPP.maintain.svg)  
-[![Install Mumble-web with YunoHost](https://install-app.yunohost.org/install-with-yunohost.png)](https://install-app.yunohost.org/?app=REPLACEBYYOURAPP)
+[![Integration level](https://dash.yunohost.org/integration/mumbleweb.svg)](https://dash.yunohost.org/appci/app/mumbleweb) ![](https://ci-apps.yunohost.org/ci/badges/mumbleweb.status.svg) ![](https://ci-apps.yunohost.org/ci/badges/mumbleweb.maintain.svg)  
+[![Install Mumble-web with YunoHost](https://install-app.yunohost.org/install-with-yunohost.png)](https://install-app.yunohost.org/?app=mumbleweb)
 
 *[Lire ce readme en français.](./README_fr.md)*
 
@@ -34,8 +34,8 @@ How to configure this app: From an admin panel, a plain file with SSH, or any ot
 
 #### Multi-user support
 
-Are LDAP and HTTP auth supported?
-Can the app be used by multiple users?
+ * Are LDAP and HTTP auth supported?
+ * Can the app be used by multiple users?
 
 #### Supported architectures
 

@@ -1,5 +1,5 @@
 [Unit]
-Description=Mumble web interface
+Description=Mumble web: High quality voice chat software
 Documentation=https://github.com/johni0702/mumble-web
 Requires=network.target mumble-server.service
 After=network.target mumble-server.service
