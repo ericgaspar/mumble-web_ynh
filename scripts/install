@@ -145,7 +145,7 @@ if [ "$mumbleweb" -eq 1 ] ; then
 	    #ynh_exec_as $app PATH="$nodejs_path:$PATH" "$nodejs_path/npm" install --save --loglevel warn
 	    #ynh_exec_as $app PATH="$nodejs_path:$PATH" "$nodejs_path/npm" run build
 	    ynh_exec_as $app env "$ynh_node_load_PATH" npm install
-	    ynh_exec_as $app env "$ynh_node_load_PATH" run build
+	    #ynh_exec_as $app env "$ynh_node_load_PATH" run build
 	    #ls -lah
 	popd
 fi
