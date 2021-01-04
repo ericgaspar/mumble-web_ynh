@@ -1,6 +1,25 @@
 #!/bin/bash
 
+#=================================================
+# COMMON VARIABLES
+#=================================================
+
+# dependencies used by the app
 pkg_dependencies="mumble-server mailutils websockify"
+
+nodejs_version=12
+
+#=================================================
+# PERSONAL HELPERS
+#=================================================
+
+#=================================================
+# EXPERIMENTAL HELPERS
+#=================================================
+
+#=================================================
+# FUTURE OFFICIAL HELPERS
+#=================================================
 
 # Send an email to inform the administrator
 #
@@ -63,6 +82,7 @@ $(yunohost tools diagnosis | grep -B 100 "services:" | sed '/services:/d')"
 	echo "$mail_message" | $mail_bin -a "Content-Type: text/plain; charset=UTF-8" -s "$mail_subject" "$recipients"
 }
 
+#=================================================
 
 # Execute a command as another user
 # usage: ynh_exec_as USER COMMAND [ARG ...]

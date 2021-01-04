@@ -38,6 +38,7 @@ su_passwd=$(ynh_string_random)
 #=================================================
 # CHECK IF THE APP CAN BE INSTALLED WITH THESE ARGS
 #=================================================
+ynh_script_progression --message="Validating installation parameters..." --weight=1
 
 final_path=/var/www/$app
 test ! -e "$final_path" || ynh_die "This path already contains a folder"
@@ -62,16 +63,17 @@ ynh_app_setting_set "$app" is_public       "$is_public"
 #=================================================
 # FIND AND OPEN A PORT
 #=================================================
+ynh_script_progression --message="Configuring firewall..." --weight=1
 
 port=$(ynh_find_port 64738)
-ynh_app_setting_set "$app" port "$port"
+ynh_app_setting_set --app=$app --key=port --value=$port
 
 # Open port in firewall
 yunohost firewall allow Both "$port"
 
 if [ "$mumbleweb" -eq 1 ] ; then
     port_web=$(ynh_find_port 64800)
-    ynh_app_setting_set "$app" port_web "$port_web"
+    ynh_app_setting_set --app=$app --key=port --value=$port_web
     # Open port in firewall
     yunohost firewall allow Both "$port_web"
 fi
@@ -79,37 +81,32 @@ fi
 #=================================================
 # INSTALL DEPENDENCIES
 #=================================================
+ynh_script_progression --message="Installing dependencies..." --weight=4
 
 # Install Mumble Debian package via apt
 ynh_install_app_dependencies $pkg_dependencies
 
 if [ "$mumbleweb" -eq 1 ] ; then
-    ynh_install_nodejs --nodejs_version="10"
+    ynh_exec_warn_less ynh_install_nodejs --nodejs_version=$nodejs_version
 fi
 
 #=================================================
 # INSTALL Mumble-web
 #=================================================
 
-
-ynh_app_setting_set "$app" final_path "$final_path"
 mkdir -p "$final_path"
-
+ynh_app_setting_set --app=$app --key=final_path --value=$final_path
 
 if [ "$mumbleweb" -eq 1 ] ; then
     ynh_setup_source --dest_dir="$final_path"
 fi
 
-
 #=================================================
 # NGINX CONFIGURATION
 #=================================================
-ynh_script_progression --message="Configuring nginx web server..." --time --weight=1
-
-### `ynh_add_nginx_config` will use the file conf/nginx.conf
+ynh_script_progression --message="Configuring NGINX web server..." --weight=1
 
 # Create a dedicated nginx config
-
 ynh_add_nginx_config "port_web"
 
 #=================================================
@@ -131,25 +128,26 @@ mumble_conf="$final_path/mumble-server.ini"
 
 cp ../conf/mumble-server.ini "$mumble_conf"
 
-ynh_replace_string "__FINALPATH__" "$final_path"     "$mumble_conf"
-ynh_replace_string "__APP__"      "$app"             "$mumble_conf"
-ynh_replace_string "__WELCOME__"  "$welcometext"     "$mumble_conf"
-ynh_replace_string "__PORT__"     "$port"            "$mumble_conf"
-ynh_replace_string "__SRV_PWD__"  "$server_password" "$mumble_conf"
-ynh_replace_string "__REGISTER__" "$registerName"    "$mumble_conf"
-ynh_replace_string "__DOMAIN__"   "$domain"          "$mumble_conf"
+ynh_replace_string --match_string="__FINALPATH__" --replace_string="$final_path"      --target_file="$mumble_conf"
+ynh_replace_string --match_string="__APP__"       --replace_string="$app"             --target_file="$mumble_conf"
+ynh_replace_string --match_string="__WELCOME__"   --replace_string="$welcometext"     --target_file="$mumble_conf"
+ynh_replace_string --match_string="__PORT__"      --replace_string="$port"            --target_file="$mumble_conf"
+ynh_replace_string --match_string="__SRV_PWD__"   --replace_string="$server_password" --target_file="$mumble_conf"
+ynh_replace_string --match_string="__REGISTER__"  --replace_string="$registerName"    --target_file="$mumble_conf"
+ynh_replace_string --match_string="__DOMAIN__"    --replace_string="$domain"          --target_file="$mumble_conf"
 
 ynh_store_file_checksum "$mumble_conf"
 
 if [ "$mumbleweb" -eq 1 ] ; then
 	ynh_use_nodejs
-	(
-	    cd "$final_path"
-	    chown -R "$app": "$final_path"
-	    ynh_exec_as "$app" PATH="$nodejs_path:$PATH" "$nodejs_path/npm" install --save --loglevel warn
-	    ynh_exec_as "$app" PATH="$nodejs_path:$PATH" "$nodejs_path/npm" run build
+	pushd "$final_path" 
+	    chown -R $app: "$final_path"
+	    #ynh_exec_as $app PATH="$nodejs_path:$PATH" "$nodejs_path/npm" install --save --loglevel warn
+	    #ynh_exec_as $app PATH="$nodejs_path:$PATH" "$nodejs_path/npm" run build
+	    ynh_exec_warn_less npm install --save --loglevel warn
+	    ynh_exec_warn_less run build
 	    ls -lah
-	)
+	popd
 fi
 
 #=================================================
@@ -160,8 +158,9 @@ fi
 ynh_add_systemd_config
 
 if [ "$mumbleweb" -eq 1 ] ; then
-    ynh_replace_string "__PORT__"   "$port"    "../conf/mumble-web.service"
-    ynh_replace_string "__PORT_WEB__"   "$port_web"    "../conf/mumble-web.service"
+    ynh_replace_string --match_string="__PORT__"     --replace_string="$port"     --target_file="../conf/mumble-web.service"
+    ynh_replace_string --match_string="__PORT_WEB__" --replace_string="$port_web" --target_file="../conf/mumble-web.service"
+
 	ynh_add_systemd_config "$app-web" mumble-web.service
 fi
 
@@ -198,9 +197,14 @@ systemctl disable mumble-server
 #=================================================
 
 # Add Mumble as a YunoHost service
-yunohost service add "$app" -l "/var/log/mumble-server/$app.log"
+yunohost service add $app --description="Mumble server" --log="/var/log/$app/$app.log" --needs_exposed_ports $port
 
-systemctl restart "$app"
+#=================================================
+# START SYSTEMD SERVICE
+#=================================================
+ynh_script_progression --message="Starting a systemd service..." --weight=3
+
+ynh_systemd_action --service_name=$app --action=restart #--log_path="/var/log/$app/$app.log"
 
 #=================================================
 # SETUP SSOWAT
@@ -217,7 +221,7 @@ fi
 #=================================================
 # RELOAD NGINX
 #=================================================
-ynh_script_progression --message="Reloading nginx web server..." --time --weight=1
+ynh_script_progression --message="Reloading NGINX web server..." --weight=1
 
 ynh_systemd_action --service_name=nginx --action=reload
 
