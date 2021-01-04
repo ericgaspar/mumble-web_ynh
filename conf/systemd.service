@@ -1,13 +1,24 @@
 [Unit]
-Description=Mumble web: High quality voice chat software
-Documentation=https://github.com/johni0702/mumble-web
-Requires=network.target mumble-server.service
-After=network.target mumble-server.service
+Description=Mumble Server (Murmur, app __APP__)
+Requires=network-online.target
+After=network.target
 
 [Service]
-Type=simple
-User=www-data
-ExecStart=/usr/bin/websockify --web=/usr/lib/node_modules/mumble-web/dist --ssl-target localhost:64737 localhost:64738
+User=mumble-server
+Group=mumble-server
+Type=forking
+# https://www.freedesktop.org/software/systemd/man/systemd.exec.html#RuntimeDirectory=
+RuntimeDirectory=mumble-server
+ExecStart=/usr/sbin/murmurd -ini __FINALPATH__/mumble-server.ini
+PIDFile=/var/run/mumble-server/__APP__.pid
+ExecReload=/bin/kill -s HUP $MAINPID
+PrivateDevices=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ProtectControlGroups=yes
+ProtectKernelModules=yes
+ReadWritePaths=__FINALPATH__ /var/log/mumble-server /var/run/mumble-server
 
 [Install]
 WantedBy=multi-user.target

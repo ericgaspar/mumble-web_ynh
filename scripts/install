@@ -47,15 +47,15 @@ test ! -e "$final_path" || ynh_die "This path already contains a folder"
 #=================================================
 
 # Save app settings
-ynh_app_setting_set --app=$app --key=domain          --value=$domain
-ynh_app_setting_set --app=$app --key=no_sso          --value=true
-ynh_app_setting_set --app=$app --key=server_password --value=$server_password
-ynh_app_setting_set --app=$app --key=su_passwd       --value=$su_passwd
-ynh_app_setting_set --app=$app --key=welcometext     --value=$welcometext
-ynh_app_setting_set --app=$app --key=registerName    --value=$registerName
-ynh_app_setting_set --app=$app --key=instance_id     --value=$instance_id
-ynh_app_setting_set --app=$app --key=mumbleweb       --value=$mumbleweb
-ynh_app_setting_set --app=$app --key=is_public       --value=$is_public
+ynh_app_setting_set "$app" domain          "$domain"
+ynh_app_setting_set "$app" no_sso          "true"
+ynh_app_setting_set "$app" server_password "$server_password"
+ynh_app_setting_set "$app" su_passwd       "$su_passwd"
+ynh_app_setting_set "$app" welcometext     "$welcometext"
+ynh_app_setting_set "$app" registerName    "$registerName"
+ynh_app_setting_set "$app" instance_id     "$instance_id"
+ynh_app_setting_set "$app" mumbleweb       "$mumbleweb"
+ynh_app_setting_set "$app" is_public       "$is_public"
 
 #=================================================
 # STANDARD MODIFICATIONS
@@ -69,36 +69,48 @@ ynh_app_setting_set "$app" port "$port"
 # Open port in firewall
 yunohost firewall allow Both "$port"
 
-port_web=$(ynh_find_port 64800)
-ynh_app_setting_set "$app" port_web "$port_web"
-# Open port in firewall
-yunohost firewall allow Both "$port_web"
+if [ "$mumbleweb" -eq 1 ] ; then
+    port_web=$(ynh_find_port 64800)
+    ynh_app_setting_set "$app" port_web "$port_web"
+    # Open port in firewall
+    yunohost firewall allow Both "$port_web"
+fi
 
 #=================================================
 # INSTALL DEPENDENCIES
 #=================================================
-ynh_script_progression --message="Installing dependencies..." --weight=20
 
+# Install Mumble Debian package via apt
 ynh_install_app_dependencies $pkg_dependencies
 
-# Install Nodejs
-ynh_exec_warn_less ynh_install_nodejs --nodejs_version=$nodejs_version
+if [ "$mumbleweb" -eq 1 ] ; then
+    ynh_install_nodejs --nodejs_version="10"
+fi
 
 #=================================================
 # INSTALL Mumble-web
 #=================================================
-ynh_script_progression --message="Setting up source files..." --weight=2
 
-ynh_app_setting_set --app=$app --key=final_path --value=$final_path
 
-git clone https://github.com/johni0702/mumble-web "$final_path" --quiet
+ynh_app_setting_set "$app" final_path "$final_path"
+mkdir -p "$final_path"
+
+
+if [ "$mumbleweb" -eq 1 ] ; then
+    ynh_setup_source --dest_dir="$final_path"
+fi
+
 
 #=================================================
 # NGINX CONFIGURATION
 #=================================================
-ynh_script_progression --message="Configuring NGINX web server..." --weight=1
+ynh_script_progression --message="Configuring nginx web server..." --time --weight=1
 
-ynh_add_nginx_config
+### `ynh_add_nginx_config` will use the file conf/nginx.conf
+
+# Create a dedicated nginx config
+
+ynh_add_nginx_config "port_web"
 
 #=================================================
 # CREATE DEDICATED USER
@@ -119,16 +131,17 @@ mumble_conf="$final_path/mumble-server.ini"
 
 cp ../conf/mumble-server.ini "$mumble_conf"
 
-ynh_replace_string --match_string="__FINALPATH__" --replace_string="$final_path"     --target_file="$mumble_conf"
-ynh_replace_string --match_string="__APP__"      --replace_string="$app"             --target_file="$mumble_conf"
-ynh_replace_string --match_string="__WELCOME__"  --replace_string="$welcometext"     --target_file="$mumble_conf"
-ynh_replace_string --match_string="__PORT__"     --replace_string="$port"            --target_file="$mumble_conf"
-ynh_replace_string --match_string="__SRV_PWD__"  --replace_string="$server_password" --target_file="$mumble_conf"
-ynh_replace_string --match_string="__REGISTER__" --replace_string="$registerName"    --target_file="$mumble_conf"
-ynh_replace_string --match_string="__DOMAIN__"   --replace_string="$domain"          --target_file="$mumble_conf"
+ynh_replace_string "__FINALPATH__" "$final_path"     "$mumble_conf"
+ynh_replace_string "__APP__"      "$app"             "$mumble_conf"
+ynh_replace_string "__WELCOME__"  "$welcometext"     "$mumble_conf"
+ynh_replace_string "__PORT__"     "$port"            "$mumble_conf"
+ynh_replace_string "__SRV_PWD__"  "$server_password" "$mumble_conf"
+ynh_replace_string "__REGISTER__" "$registerName"    "$mumble_conf"
+ynh_replace_string "__DOMAIN__"   "$domain"          "$mumble_conf"
 
 ynh_store_file_checksum "$mumble_conf"
 
+if [ "$mumbleweb" -eq 1 ] ; then
 	ynh_use_nodejs
 	(
 	    cd "$final_path"
@@ -137,6 +150,7 @@ ynh_store_file_checksum "$mumble_conf"
 	    ynh_exec_as "$app" PATH="$nodejs_path:$PATH" "$nodejs_path/npm" run build
 	    ls -lah
 	)
+fi
 
 #=================================================
 # SETUP SYSTEMD
@@ -145,10 +159,11 @@ ynh_store_file_checksum "$mumble_conf"
 # Create a dedicated systemd config
 ynh_add_systemd_config
 
-ynh_replace_string --match_string="__PORT__"   --replace_string="$port" --target_file="../conf/mumble-web.service"
-ynh_replace_string --match_string="__PORT_WEB__" --replace_string="$port_web" --target_file="../conf/mumble-web.service"
-
-ynh_add_systemd_config "$app-web" mumble-web.service
+if [ "$mumbleweb" -eq 1 ] ; then
+    ynh_replace_string "__PORT__"   "$port"    "../conf/mumble-web.service"
+    ynh_replace_string "__PORT_WEB__"   "$port_web"    "../conf/mumble-web.service"
+	ynh_add_systemd_config "$app-web" mumble-web.service
+fi
 
 #=================================================
 # GENERIC FINALIZATION
@@ -157,6 +172,7 @@ ynh_add_systemd_config "$app-web" mumble-web.service
 #=================================================
 
 chmod -R 770 "$final_path"
+chown -R :mumble-server "$final_path"
 
 #=================================================
 # Add user to ssl-cert so it can read certificates
@@ -182,14 +198,14 @@ systemctl disable mumble-server
 #=================================================
 
 # Add Mumble as a YunoHost service
-yunohost service add $app --description "High quality voice chat software" --log "/var/log/mumble-server/$app.log"
+yunohost service add "$app" -l "/var/log/mumble-server/$app.log"
 
 systemctl restart "$app"
 
 #=================================================
 # SETUP SSOWAT
 #=================================================
-ynh_script_progression --message="Configuring SSOwat..." --weight=1
+ynh_script_progression --message="Configuring SSOwat..." --time --weight=1
 
 # Make app public if necessary
 if [ "$is_public" -eq 1 ]
@@ -201,7 +217,7 @@ fi
 #=================================================
 # RELOAD NGINX
 #=================================================
-ynh_script_progression --message="Reloading NGINX web server..." --weight=1
+ynh_script_progression --message="Reloading nginx web server..." --time --weight=1
 
 ynh_systemd_action --service_name=nginx --action=reload
 
@@ -226,8 +242,9 @@ Please open a new issue in this project: https://github.com/YunoHost-Apps/mumble
 "
 ynh_send_readme_to_admin "$message"
 
+
 #=================================================
 # END OF SCRIPT
 #=================================================
 
-ynh_script_progression --message="Installation of $app completed" --last
+ynh_script_progression --message="Installation of $app completed" --time --last

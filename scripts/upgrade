@@ -94,6 +94,7 @@ if [ -z "$instance_id" ]; then
 	ynh_app_setting_set "$app" instance_id "$instance_id"
 fi
 
+
 #=================================================
 # BACKUP BEFORE UPGRADE THEN ACTIVE TRAP
 #=================================================
@@ -153,6 +154,7 @@ ynh_script_progression --message="Making sure dedicated system user exists..." -
 
 # Create a dedicated user (if not existing)
 ynh_system_user_create --username="$app"
+
 
 #=================================================
 # SPECIFIC UPGRADE
@@ -238,7 +240,7 @@ systemctl disable mumble-server
 #=================================================
 
 # Add Mumble as a YunoHost service
-yunohost service add "$app" --description "High quality voice chat software" --log "/var/log/mumble-server/$app.log"
+yunohost service add "$app" -l "/var/log/mumble-server/$app.log"
 
 #=================================================
 # START SYSTEMD SERVICE
@@ -251,7 +253,7 @@ ynh_systemd_action --service_name="$app-web" --action="start"
 #=================================================
 # RELOAD NGINX
 #=================================================
-ynh_script_progression --message="Reloading NGINX web server..." --time --weight=1
+ynh_script_progression --message="Reloading nginx web server..." --time --weight=1
 
 ynh_systemd_action --service_name=nginx --action=reload
 

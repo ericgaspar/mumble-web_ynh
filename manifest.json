@@ -1,6 +1,6 @@
 {
-    "name": "Mumble Web",
-    "id": "mumbleweb",
+    "name": "Mumble Server",
+    "id": "mumbleserver",
     "packaging_format": 1,
     "description": {
         "en": "Mumble is a libre, low-latency, high quality voice chat software primarily intended for use while gaming.",
@@ -9,11 +9,11 @@
     "url": "https://mumble.info",
     "license": "BSD-3-Clause",
     "maintainer": {
-        "name": "",
-        "email": ""
+        "name": "Jean-Baptiste Holcroft",
+        "email": "jean-baptiste@holcroft.fr"
     },
     "requirements": {
-        "yunohost": ">= 4.0.0"
+        "yunohost": ">= 3.7.0"
     },
     "version": "1.2.8~ynh7",
     "multi_instance": true,
