@@ -8,6 +8,9 @@ After=network.target mumble-server.service
 Type=simple
 User=__APP__
 Group=__APP__
+WorkingDirectory=__FINALPATH__
+Environment="PATH=__ENV_PATH__"
+Environment="NODE_ENV=production"
 ExecStart=/usr/bin/websockify --web=__FINALPATH__/dist --ssl-target localhost:64737 localhost:64738
 
 [Install]
