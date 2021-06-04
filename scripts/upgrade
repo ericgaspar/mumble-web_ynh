@@ -5,107 +5,47 @@
 #=================================================
 # IMPORT GENERIC HELPERS
 #=================================================
+
 source _common.sh
 source /usr/share/yunohost/helpers
 
 #=================================================
 # LOAD SETTINGS
 #=================================================
+ynh_script_progression --message="Loading installation settings..." --time --weight=1
 
 app=$YNH_APP_INSTANCE_NAME
 
-domain=$(ynh_app_setting_get "$app" domain)
-path_url=$(ynh_app_setting_get --app="$app" --key=path)
-is_public=$(ynh_app_setting_get --app="$app" --key=is_public)
-no_sso=$(ynh_app_setting_get "$app" no_sso)
-server_password=$(ynh_app_setting_get "$app" server_password)
-su_passwd=$(ynh_app_setting_get "$app" su_passwd)
-welcometext=$(ynh_app_setting_get "$app" welcometext)
-registerName=$(ynh_app_setting_get "$app" registerName)
-port=$(ynh_app_setting_get "$app" port)
-port_web=$(ynh_app_setting_get "$app" port_web)
-final_path=$(ynh_app_setting_get "$app" final_path)
-instance_id=$(ynh_app_setting_get "$app" instance_id)
-mumbleweb=$(ynh_app_setting_get "$app" mumbleweb)
+domain=$(ynh_app_setting_get --app=$app --key=domain)
+path_url=$(ynh_app_setting_get --app=$app --key=path)
+admin=$(ynh_app_setting_get --app=$app --key=admin)
+final_path=$(ynh_app_setting_get --app=$app --key=final_path)
+language=$(ynh_app_setting_get --app=$app --key=language)
+db_name=$(ynh_app_setting_get --app=$app --key=db_name)
 
 #=================================================
-# ENSURE DOWNWARD COMPATIBILITY
+# CHECK VERSION
 #=================================================
 
-# If final_path doesn't exist, create it
-if [ -z "$final_path" ]; then
-	final_path=/var/www/$app
-	ynh_app_setting_set "$app" final_path "$final_path"
-fi
-
-# test old time
-if [ -z "$server_password" ]; then
-	old_mumble_conf="/etc/mumble-server.ini"
-
-	server_password=$(cat "$old_mumble_conf" \
-		| grep "serverpassword=" \
-		| sed "s/serverpassword=//")
-
-	welcometext=$(cat "$old_mumble_conf" \
-		| grep "welcometext=" \
-		| sed "s/welcometext=//")
-
-	registerName=$(cat "$old_mumble_conf" \
-		| grep "registerName=" \
-		| sed "s/registerName=//")
-
-	# we don't know what the previous password was, let's regenerate it
-	su_passwd=$(ynh_string_random)
-
-	domain=$(yunohost domain list \
-		| grep "\- " \
-		| head -1 \
-		| sed -r "s/.* (([a-z])*\.([a-z])*).*/\1/g")
-
-	ynh_app_setting_set "$app" server_password "$server_password"
-	ynh_app_setting_set "$app" welcometext     "$welcometext"
-	ynh_app_setting_set "$app" registerName    "$registerName"
-	ynh_app_setting_set "$app" su_passwd       "$su_passwd"
-	ynh_app_setting_set "$app" domain          "$domain"
-
-	systemctl stop mumble-server
-	dpkg-reconfigure mumble-server --frontend=Noninteractive
-	systemctl stop mumble-server
-	systemctl disable mumble-server
-fi
-
-# Fix SSO issue
-# https://github.com/YunoHost-Apps/mumbleserver_ynh/issues/19
-if [ -z "$domain" ]; then
-	domain=$(ynh_app_setting_get "$app" domain_mumble)
-	ynh_app_setting_set "$app" domain "$domain"
-	ynh_app_setting_delete "$app" domain_mumble
-fi
-
-# Fix SSO issue
-# https://github.com/YunoHost-Apps/mumbleserver_ynh/issues/19
-if [ -z "$no_sso" ]; then
-	ynh_app_setting_set "$app" no_sso "true"
-fi
-
-# Fix multi installation
-if [ -z "$instance_id" ]; then
-	instance_id=$YNH_APP_INSTANCE_NUMBER
-	ynh_app_setting_set "$app" instance_id "$instance_id"
-fi
-
+### This helper will compare the version of the currently installed app and the version of the upstream package.
+### $upgrade_type can have 2 different values
+### - UPGRADE_APP if the upstream app version has changed
+### - UPGRADE_PACKAGE if only the YunoHost package has changed
+### ynh_check_app_version_changed will stop the upgrade if the app is up to date.
+### UPGRADE_APP should be used to upgrade the core app only if there's an upgrade to do.
+upgrade_type=$(ynh_check_app_version_changed)
 
 #=================================================
 # BACKUP BEFORE UPGRADE THEN ACTIVE TRAP
 #=================================================
+ynh_script_progression --message="Backing up the app before upgrading (may take a while)..." --time --weight=1
 
 # Backup the current version of the app
 ynh_backup_before_upgrade
 ynh_clean_setup () {
-	# restore it if the upgrade fails
- 	ynh_restore_upgradebackup
+	# Restore it if the upgrade fails
+	ynh_restore_upgradebackup
 }
-
 # Exit if an error occurs during the execution of the script
 ynh_abort_if_errors
 
@@ -116,36 +56,50 @@ ynh_abort_if_errors
 #=================================================
 ynh_script_progression --message="Stopping a systemd service..." --time --weight=1
 
-ynh_systemd_action --service_name="$app" --action="stop"
-ynh_systemd_action --service_name="$app-web" --action="stop"
+ynh_systemd_action --service_name=$app --action="stop" --log_path="/var/log/$app/$app.log"
 
 #=================================================
-# DOWNLOAD, CHECK AND UNPACK SOURCE
+# ENSURE DOWNWARD COMPATIBILITY
 #=================================================
+ynh_script_progression --message="Ensuring downward compatibility..." --time --weight=1
 
-if [ "$mumbleweb" -eq 1 ] ; then
-then
-	ynh_script_progression --message="Upgrading source files..." --time --weight=1
+#
+# N.B. : the followings setting migrations snippets are provided as *EXAMPLES*
+# of what you may want to do in some cases (e.g. a setting was not defined on
+# some legacy installs and you therefore want to initiaze stuff during upgrade)
+#
 
-	# Download, check integrity, uncompress and patch the source from app.src
-	ynh_setup_source --dest_dir="$final_path"
+# If db_name doesn't exist, create it
+#if [ -z "$db_name" ]; then
+#	db_name=$(ynh_sanitize_dbid --db_name=$app)
+#	ynh_app_setting_set --app=$app --key=db_name --value=$db_name
+#fi
+
+# If final_path doesn't exist, create it
+#if [ -z "$final_path" ]; then
+#	final_path=/var/www/$app
+#	ynh_app_setting_set --app=$app --key=final_path --value=$final_path
+#fi
+
+### If nobody installed your app before 4.1,
+### then you may safely remove these lines
+
+# Cleaning legacy permissions
+if ynh_legacy_permissions_exists; then
+	ynh_legacy_permissions_delete_all
+
+	ynh_app_setting_delete --app=$app --key=is_public
 fi
 
-#=================================================
-# NGINX CONFIGURATION
-#=================================================
-ynh_script_progression --message="Upgrading nginx web server configuration..." --time --weight=1
+if ! ynh_permission_exists --permission="admin"; then
+	# Create the required permissions
+	ynh_permission_create --permission="admin" --url="/admin" --allowed=$admin
+fi
 
-# Create a dedicated nginx config
-ynh_add_nginx_config "port_web"
-
-#=================================================
-# INSTALL DEPENDENCIES
-#=================================================
-ynh_script_progression --message="Upgrading dependencies..." --time --weight=1
-
-# Install Mumble Debian package via apt
-ynh_install_app_dependencies $pkg_dependencies
+# Create a permission if needed
+if ! ynh_permission_exists --permission="api"; then
+	ynh_permission_create --permission="api" --url="/api" --allowed="visitors" --show_tile="false" --protected="true"
+fi
 
 #=================================================
 # CREATE DEDICATED USER
@@ -153,45 +107,83 @@ ynh_install_app_dependencies $pkg_dependencies
 ynh_script_progression --message="Making sure dedicated system user exists..." --time --weight=1
 
 # Create a dedicated user (if not existing)
-ynh_system_user_create --username="$app"
+ynh_system_user_create --username=$app --home_dir="$final_path"
 
+#=================================================
+# DOWNLOAD, CHECK AND UNPACK SOURCE
+#=================================================
+
+if [ "$upgrade_type" == "UPGRADE_APP" ]
+then
+	ynh_script_progression --message="Upgrading source files..." --time --weight=1
+
+	# Download, check integrity, uncompress and patch the source from app.src
+	ynh_setup_source --dest_dir="$final_path"
+fi
+
+# FIXME: this should be managed by the core in the future
+# Here, as a packager, you may have to tweak the ownerhsip/permissions
+# such that the appropriate users (e.g. maybe www-data) can access
+# files in some cases.
+# But FOR THE LOVE OF GOD, do not allow r/x for "others" on the entire folder -
+# this will be treated as a security issue.
+chmod 750 "$final_path"
+chmod -R o-rwx "$final_path"
+chown -R $app:www-data "$final_path"
+
+#=================================================
+# NGINX CONFIGURATION
+#=================================================
+ynh_script_progression --message="Upgrading NGINX web server configuration..." --time --weight=1
+
+# Create a dedicated NGINX config
+ynh_add_nginx_config
+
+#=================================================
+# UPGRADE DEPENDENCIES
+#=================================================
+ynh_script_progression --message="Upgrading dependencies..." --time --weight=1
+
+ynh_install_app_dependencies $pkg_dependencies
+
+#=================================================
+# PHP-FPM CONFIGURATION
+#=================================================
+ynh_script_progression --message="Upgrading PHP-FPM configuration..." --time --weight=1
+
+# Create a dedicated PHP-FPM config
+ynh_add_fpm_config
 
 #=================================================
 # SPECIFIC UPGRADE
 #=================================================
-# mumble server conf.ini
+# ...
 #=================================================
 
-mkdir -p $final_path
-
-# Configuring with given settings
-mumble_conf="$final_path/mumble-server.ini"
-
-ynh_backup_if_checksum_is_different "$mumble_conf"
-
-cp ../conf/mumble-server.ini "$mumble_conf"
-
-ynh_replace_string "__FINALPATH__" "$final_path"     "$mumble_conf"
-ynh_replace_string "__APP__"      "$app"             "$mumble_conf"
-ynh_replace_string "__WELCOME__"  "$welcometext"     "$mumble_conf"
-ynh_replace_string "__PORT__"     "$port"            "$mumble_conf"
-ynh_replace_string "__SRV_PWD__"  "$server_password" "$mumble_conf"
-ynh_replace_string "__REGISTER__" "$registerName"    "$mumble_conf"
-ynh_replace_string "__DOMAIN__"   "$domain"          "$mumble_conf"
-
-ynh_store_file_checksum "$mumble_conf"
-
 #=================================================
-# SETUP SSOWAT
+# UPDATE A CONFIG FILE
 #=================================================
-ynh_script_progression --message="Upgrading SSOwat configuration..." --time --weight=1
+ynh_script_progression --message="Updating a configuration file..." --time --weight=1
 
-# Make app public if necessary
-if [ "$is_public" -eq 1 ]
-then
-	# unprotected_uris allows SSO credentials to be passed anyway
-	ynh_app_setting_set --app="$app" --key=unprotected_uris --value="/"
-fi
+### Same as during install
+###
+### The file will automatically be backed-up if it's found to be manually modified (because
+### ynh_add_config keeps track of the file's checksum)
+
+ynh_add_config --template="some_config_file" --destination="$final_path/some_config_file"
+
+# FIXME: this should be handled by the core in the future
+# You may need to use chmod 600 instead of 400,
+# for example if the app is expected to be able to modify its own config
+chmod 400 "$final_path/some_config_file"
+chown $app:$app "$final_path/some_config_file"
+
+### For more complex cases where you want to replace stuff using regexes,
+### you shoud rely on ynh_replace_string (which is basically a wrapper for sed)
+### When doing so, you also need to manually call ynh_store_file_checksum
+###
+### ynh_replace_string --match_string="match_string" --replace_string="replace_string" --target_file="$final_path/some_config_file"
+### ynh_store_file_checksum --file="$final_path/some_config_file"
 
 #=================================================
 # SETUP SYSTEMD
@@ -201,84 +193,44 @@ ynh_script_progression --message="Upgrading systemd configuration..." --time --w
 # Create a dedicated systemd config
 ynh_add_systemd_config
 
-if [ "$mumbleweb" -eq 1 ] ; then
-    ynh_replace_string "__PORT__"   "$port"    "../conf/mumble-web.service"
-    ynh_replace_string "__PORT_WEB__"   "$port_web"    "../conf/mumble-web.service"
-	ynh_add_systemd_config "$app-web" mumble-web.service
-fi
-
 #=================================================
 # GENERIC FINALIZATION
 #=================================================
-# SECURE FILES AND DIRECTORIES
+# SETUP LOGROTATE
 #=================================================
+ynh_script_progression --message="Upgrading logrotate configuration..." --time --weight=1
 
-chmod -R 770 "$final_path"
-chown -R :mumble-server "$final_path"
-
-#=================================================
-# Add user to ssl-cert so it can read certificates
-#=================================================
-
-usermod --append --groups ssl-cert mumble-server
+# Use logrotate to manage app-specific logfile(s)
+ynh_use_logrotate --non-append
 
 #=================================================
-# Set SuperUser password
+# INTEGRATE SERVICE IN YUNOHOST
 #=================================================
+ynh_script_progression --message="Integrating service in YunoHost..." --time --weight=1
 
-murmurd -ini "$mumble_conf" -supw "$su_passwd" "$instance_id"
-
-#=================================================
-# Disable default server installed by Debian's package
-#=================================================
-
-systemctl stop mumble-server
-systemctl disable mumble-server
-
-#=================================================
-# ADVERTISE SERVICE IN ADMIN PANEL
-#=================================================
-
-# Add Mumble as a YunoHost service
-yunohost service add "$app" -l "/var/log/mumble-server/$app.log"
+yunohost service add $app --description="A short description of the app" --log="/var/log/$app/$app.log"
 
 #=================================================
 # START SYSTEMD SERVICE
 #=================================================
 ynh_script_progression --message="Starting a systemd service..." --time --weight=1
 
-ynh_systemd_action --service_name="$app" --action="start"
-ynh_systemd_action --service_name="$app-web" --action="start"
+ynh_systemd_action --service_name=$app --action="start" --log_path="/var/log/$app/$app.log"
+
+#=================================================
+# UPGRADE FAIL2BAN
+#=================================================
+ynh_script_progression --message="Reconfiguring Fail2Ban..." --time --weight=1
+
+# Create a dedicated Fail2Ban config
+ynh_add_fail2ban_config --logpath="/var/log/nginx/${domain}-error.log" --failregex="Regex to match into the log for a failed login"
 
 #=================================================
 # RELOAD NGINX
 #=================================================
-ynh_script_progression --message="Reloading nginx web server..." --time --weight=1
+ynh_script_progression --message="Reloading NGINX web server..." --time --weight=1
 
 ynh_systemd_action --service_name=nginx --action=reload
-
-#=================================================
-# SEND README TO ADMIN
-#=================================================
-
-message="
-Mumbleserver was updated!
-
-Port                   : $port
-Password to join server: $server_password
-SuperUser Password     : $su_passwd
-Welcome text           : $welcometext
-Root channel (your mumble server name): $registerName
-Final path (where to find your files) : $final_path
-Mumble configuration file             : $mumble_conf
-
-Note about config file: this package will regenerate the config file on upgrade.
-If you changed it manually and upgrade mumble, you'll find a backup in $final_path.
-
-Are you facing an issue, want to improve this app or say thank you?
-Please open a new issue in this project: https://github.com/YunoHost-Apps/mumbleserver_ynh
-"
-ynh_send_readme_to_admin "$message"
 
 #=================================================
 # END OF SCRIPT
