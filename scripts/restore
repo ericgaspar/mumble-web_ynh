@@ -71,14 +71,11 @@ chmod -R o-rwx "$final_path"
 chown -R $app:www-data "$final_path"
 
 #=================================================
-# SPECIFIC RESTORATION
+# INSTALL NODEJS
 #=================================================
-# REINSTALL DEPENDENCIES
-#=================================================
-# ynh_script_progression --message="Reinstalling dependencies..." --time --weight=1
+ynh_script_progression --message="Installing NodeJS..." --weight=12
 
-# # Define and install dependencies
-# ynh_install_app_dependencies $pkg_dependencies
+ynh_install_nodejs --nodejs_version=$nodejs_version
 
 #=================================================
 # RESTORE SYSTEMD

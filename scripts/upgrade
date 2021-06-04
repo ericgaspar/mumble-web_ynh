@@ -55,27 +55,6 @@ ynh_systemd_action --service_name=$app --action="stop" --log_path="/var/log/$app
 #=================================================
 ynh_script_progression --message="Ensuring downward compatibility..." --time --weight=1
 
-#
-# N.B. : the followings setting migrations snippets are provided as *EXAMPLES*
-# of what you may want to do in some cases (e.g. a setting was not defined on
-# some legacy installs and you therefore want to initiaze stuff during upgrade)
-#
-
-# If db_name doesn't exist, create it
-#if [ -z "$db_name" ]; then
-#	db_name=$(ynh_sanitize_dbid --db_name=$app)
-#	ynh_app_setting_set --app=$app --key=db_name --value=$db_name
-#fi
-
-# If final_path doesn't exist, create it
-#if [ -z "$final_path" ]; then
-#	final_path=/var/www/$app
-#	ynh_app_setting_set --app=$app --key=final_path --value=$final_path
-#fi
-
-### If nobody installed your app before 4.1,
-### then you may safely remove these lines
-
 # Cleaning legacy permissions
 if ynh_legacy_permissions_exists; then
 	ynh_legacy_permissions_delete_all
@@ -116,29 +95,21 @@ ynh_script_progression --message="Upgrading NGINX web server configuration..." -
 ynh_add_nginx_config
 
 #=================================================
-# UPGRADE DEPENDENCIES
+# INSTALL NODEJS
 #=================================================
-# ynh_script_progression --message="Upgrading dependencies..." --time --weight=1
+ynh_script_progression --message="Installing NodeJS..." --weight=12
 
-# ynh_install_app_dependencies $pkg_dependencies
+ynh_install_nodejs --nodejs_version=$nodejs_version
 
 #=================================================
 # UPDATE A CONFIG FILE
 #=================================================
 ynh_script_progression --message="Updating a configuration file..." --time --weight=1
 
-### Same as during install
-###
-### The file will automatically be backed-up if it's found to be manually modified (because
-### ynh_add_config keeps track of the file's checksum)
+ynh_add_config --template="../conf/config.local.js" --destination="$final_path/dist/config.local.js"
 
-ynh_add_config --template="some_config_file" --destination="$final_path/some_config_file"
-
-# FIXME: this should be handled by the core in the future
-# You may need to use chmod 600 instead of 400,
-# for example if the app is expected to be able to modify its own config
-chmod 400 "$final_path/some_config_file"
-chown $app:$app "$final_path/some_config_file"
+chmod 400 "$final_path/dist/config.local.js"
+chown $app:$app "$final_path/dist/config.local.js"
 
 #=================================================
 # SETUP SYSTEMD
