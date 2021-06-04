@@ -8,7 +8,7 @@ After=network.target mumble-server.service
 Type=simple
 User=__APP__
 Group=__APP__
-ExecStart=/usr/bin/websockify --web=/usr/lib/node_modules/mumble-web/dist --ssl-target localhost:64737 localhost:64738
+ExecStart=/usr/bin/websockify --web=__FINALPATH__/dist --ssl-target localhost:64737 localhost:64738
 
 [Install]
 WantedBy=multi-user.target
