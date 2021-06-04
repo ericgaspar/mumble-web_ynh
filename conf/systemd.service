@@ -1,8 +1,8 @@
 [Unit]
 Description=Mumble web interface
 Documentation=https://github.com/johni0702/mumble-web
-Requires=network.target mumble-server.service
-After=network.target mumble-server.service
+Requires=network.target #mumble-server.service
+After=network.target #mumble-server.service
 
 [Service]
 Type=simple
