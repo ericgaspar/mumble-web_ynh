@@ -5,7 +5,7 @@
 #=================================================
 
 # NodeJS version
-nodejs_version=14
+nodejs_version=12
 
 #=================================================
 # PERSONAL HELPERS
