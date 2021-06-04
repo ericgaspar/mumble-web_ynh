@@ -1,15 +1,13 @@
 [Unit]
-Description=Small description of the service
-After=network.target
+Description=Mumble web interface
+Documentation=https://github.com/johni0702/mumble-web
+Requires=network.target mumble-server.service
+After=network.target mumble-server.service
 
 [Service]
 Type=simple
-User=__APP__
-Group=__APP__
-WorkingDirectory=__FINALPATH__/
-ExecStart=__FINALPATH__/script
-StandardOutput=append:/var/log/__APP__/__APP__.log
-StandardError=inherit
+User=www-data
+ExecStart=/usr/bin/websockify --web=/usr/lib/node_modules/mumble-web/dist --ssl-target localhost:64737 localhost:64738
 
 [Install]
 WantedBy=multi-user.target
