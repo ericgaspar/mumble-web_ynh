@@ -106,11 +106,11 @@ ynh_script_progression --message="Installing Mumble..." --weight=60
 
 chown -R $app: $final_path
 
-pushd $final_path
- 	ynh_use_nodejs
- 	ynh_exec_as $app npm install
- 	#npm install -g mumble-web
+pushd "$final_path"
+	ynh_use_nodejs
+	ynh_exec_warn_less npm i #-g mumble-web
 popd
+
 
 #=================================================
 # ADD A CONFIGURATION
