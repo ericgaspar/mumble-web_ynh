@@ -164,22 +164,22 @@ ynh_systemd_action --service_name=nginx --action=reload
 # SEND README TO ADMIN
 #=================================================
 
-message="
-Port                   : $port
-Password to join server: $server_password
-SuperUser Password     : $su_passwd
-Welcome text           : $welcometext
-Root channel (your Mumble server name): $registername
-Final path (where to find your files) : $final_path
-Mumble configuration file             : $final_path/mumble-server.ini
+# message="
+# Port                   : $port
+# Password to join server: $server_password
+# SuperUser Password     : $su_passwd
+# Welcome text           : $welcometext
+# Root channel (your Mumble server name): $registername
+# Final path (where to find your files) : $final_path
+# Mumble configuration file             : $final_path/mumble-server.ini
 
-Note about config file: this package will regenerate the config file on upgrade.
-If you changed it manually and upgrade Mumble, you'll find a backup in $final_path.
+# Note about config file: this package will regenerate the config file on upgrade.
+# If you changed it manually and upgrade Mumble, you'll find a backup in $final_path.
 
-Are you facing an issue, want to improve this app or say thank you?
-Please open a new issue in this project: https://github.com/YunoHost-Apps/mumbleserver_ynh
-"
-ynh_send_readme_to_admin "$message"
+# Are you facing an issue, want to improve this app or say thank you?
+# Please open a new issue in this project: https://github.com/YunoHost-Apps/mumbleserver_ynh
+# "
+# ynh_send_readme_to_admin "$message"
 
 #=================================================
 # END OF SCRIPT
