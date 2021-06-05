@@ -18,16 +18,8 @@ app=$YNH_APP_INSTANCE_NAME
 
 domain=$(ynh_app_setting_get --app=$app --key=domain)
 path_url=$(ynh_app_setting_get --app=$app --key=path)
-no_sso=$(ynh_app_setting_get --app=$app --key=no_sso)
-server_password=$(ynh_app_setting_get --app=$app --key=server_password)
-su_passwd=$(ynh_app_setting_get --app=$app --key=su_passwd)
-welcometext=$(ynh_app_setting_get --app=$app --key=welcometext)
-registername=$(ynh_app_setting_get --app=$app --key=registerName)
 port=$(ynh_app_setting_get --app=$app --key=port)
-port_web=$(ynh_app_setting_get --app=$app --key=port_web)
 final_path=$(ynh_app_setting_get --app=$app --key=final_path)
-instance_id=$(ynh_app_setting_get --app=$app --key=instance_id)
-mumbleweb=$(ynh_app_setting_get --app=$app --key=mumbleweb)
 
 #=================================================
 # CHECK VERSION
@@ -46,60 +38,11 @@ if [ -z "$final_path" ]; then
 	ynh_app_setting_set "$app" final_path "$final_path"
 fi
 
-# test old time
-if [ -z "$server_password" ]; then
-	old_mumble_conf="/etc/mumble-server.ini"
+# Cleaning legacy permissions
+if ynh_legacy_permissions_exists; then
+	ynh_legacy_permissions_delete_all
 
-	server_password=$(cat "$old_mumble_conf" \
-		| grep "serverpassword=" \
-		| sed "s/serverpassword=//")
-
-	welcometext=$(cat "$old_mumble_conf" \
-		| grep "welcometext=" \
-		| sed "s/welcometext=//")
-
-	registername=$(cat "$old_mumble_conf" \
-		| grep "registerName=" \
-		| sed "s/registername=//")
-
-	# we don't know what the previous password was, let's regenerate it
-	su_passwd=$(ynh_string_random)
-
-	domain=$(yunohost domain list \
-		| grep "\- " \
-		| head -1 \
-		| sed -r "s/.* (([a-z])*\.([a-z])*).*/\1/g")
-
-	ynh_app_setting_set --app=$app --key=server_password --value=$server_password
-	ynh_app_setting_set --app=$app --key=welcometext --value=$welcometext
-	ynh_app_setting_set --app=$app --key=registerName --value=$registername
-	ynh_app_setting_set --app=$app --key=su_passwd --value=$su_passwd
-	ynh_app_setting_set --app=$app --key=domain --value=$domain
-
-	systemctl stop mumble-server
-	dpkg-reconfigure mumble-server --frontend=Noninteractive
-	systemctl stop mumble-server
-	systemctl disable mumble-server --quiet
-fi
-
-# Fix SSO issue
-# https://github.com/YunoHost-Apps/mumbleserver_ynh/issues/19
-if [ -z "$domain" ]; then
-	domain=$(ynh_app_setting_get "$app" domain_mumble)
-	ynh_app_setting_set "$app" domain "$domain"
-	ynh_app_setting_delete "$app" domain_mumble
-fi
-
-# Fix SSO issue
-# https://github.com/YunoHost-Apps/mumbleserver_ynh/issues/19
-if [ -z "$no_sso" ]; then
-	ynh_app_setting_set "$app" no_sso "true"
-fi
-
-# Fix multi installation
-if [ -z "$instance_id" ]; then
-	instance_id=$YNH_APP_INSTANCE_NUMBER
-	ynh_app_setting_set "$app" instance_id "$instance_id"
+	ynh_app_setting_delete --app=$app --key=is_public
 fi
 
 #=================================================
@@ -125,9 +68,6 @@ ynh_abort_if_errors
 ynh_script_progression --message="Stopping a systemd service..." --weight=1
 
 ynh_systemd_action --service_name="$app" --action="stop"
-if [ "$mumbleweb" -eq 1 ] ; then
-	ynh_systemd_action --service_name="mumble-web" --action="stop"
-fi
 
 #=================================================
 # CREATE DEDICATED USER
@@ -141,12 +81,17 @@ ynh_system_user_create --username="$app" --home_dir="$final_path"
 # DOWNLOAD, CHECK AND UNPACK SOURCE
 #=================================================
 
-if [ "$mumbleweb" -eq 1 ] ; then
-	ynh_script_progression --message="Upgrading source files..." --weight=1
+if [ "$upgrade_type" == "UPGRADE_APP" ]
+then
+	ynh_script_progression --message="Upgrading source files..." --time --weight=1
 
 	# Download, check integrity, uncompress and patch the source from app.src
-	ynh_setup_source --dest_dir="$final_path" #--keep="$final_path/mumble-server.ini"
+	ynh_setup_source --dest_dir="$final_path"
 fi
+
+chmod 750 "$final_path"
+chmod -R o-rwx "$final_path"
+chown -R $app:www-data "$final_path"
 
 #=================================================
 # NGINX CONFIGURATION
@@ -154,9 +99,7 @@ fi
 ynh_script_progression --message="Upgrading NGINX web server configuration..."  --weight=5
 
 # Create a dedicated nginx config
-if [ "$mumbleweb" -eq 1 ] ; then
-	ynh_add_nginx_config
-fi
+ynh_add_nginx_config
 
 #=================================================
 # INSTALL DEPENDENCIES
@@ -166,18 +109,7 @@ ynh_script_progression --message="Upgrading dependencies..." --weight=1
 # Install Mumble Debian package via apt
 ynh_exec_warn_less ynh_install_app_dependencies $pkg_dependencies
 
-if [ "$mumbleweb" -eq 1 ] ; then
-    ynh_install_nodejs --nodejs_version=$nodejs_version
-fi
-
-#=================================================
-# SPECIFIC UPGRADE
-#=================================================
-# mumble server conf.ini
-#=================================================
-
-#mkdir -p $final_path
-ynh_add_config --template="../conf/mumble-server.ini" --destination="$final_path/mumble-server.ini"
+ynh_install_nodejs --nodejs_version=$nodejs_version
 
 #=================================================
 # SETUP SYSTEMD
@@ -185,54 +117,17 @@ ynh_add_config --template="../conf/mumble-server.ini" --destination="$final_path
 ynh_script_progression --message="Upgrading systemd configuration..." --weight=2
 
 # Create a dedicated systemd config
+ynh_replace_string --match_string="__ENV_PATH__" --replace_string="$PATH" --target_file="../conf/$app.service"
+
 ynh_add_systemd_config
-
-if [ "$mumbleweb" -eq 1 ] ; then
-	ynh_replace_string --match_string="__ENV_PATH__" --replace_string="$PATH" --target_file="../conf/mumble-web.service"
-	ynh_add_systemd_config --service=mumble-web --template=mumble-web.service
-fi
-
-#=================================================
-# GENERIC FINALIZATION
-#=================================================
-# SECURE FILES AND DIRECTORIES
-#=================================================
-
-chmod -R 770 "$final_path"
-chown -R :mumble-server "$final_path"
-
-#=================================================
-# ADD USER TO SSL-CERT
-#=================================================
-
-# Add user to ssl-cert so it can read certificates
-usermod --append --groups ssl-cert mumble-server
-
-#=================================================
-# Set SuperUser password
-#=================================================
-
-# || true temporarily to ignore a bug in murmurd 1.3.0
-# https://github.com/mumble-voip/mumble/issues/3911
-murmurd -ini "../conf/mumble-server.ini" -supw "$su_passwd" "$instance_id" || true
-
-#=================================================
-# Disable default server installed by Debian's package
-#=================================================
-
-systemctl stop mumble-server
-systemctl disable mumble-server --quiet
 
 #=================================================
 # ADVERTISE SERVICE IN ADMIN PANEL
 #=================================================
 
 # Add Mumble as a YunoHost service
-yunohost service add $app --description="Mumble server" --log="/var/log/$app/$app.log" --needs_exposed_ports=$port
-# Add Mumble as a YunoHost service
-if [ "$mumbleweb" -eq 1 ] ; then
-	yunohost service add mumble-web --description="Mumble web interface" --log="/var/log/$app/mumble-web.log"
-fi
+yunohost service add $app --description="Mumble web interface" --log="/var/log/$app/$app.log"
+
 
 #=================================================
 # START SYSTEMD SERVICE
@@ -240,18 +135,13 @@ fi
 ynh_script_progression --message="Starting a systemd service..." --weight=1
 
 ynh_systemd_action --service_name="$app" --action="start" --log_path="/var/log/$app/$app.log"
-if [ "$mumbleweb" -eq 1 ] ; then
-	ynh_systemd_action --service_name="mumble-web" --action="start" --log_path="/var/log/$app/mumble-web.log"
-fi
 
 #=================================================
 # RELOAD NGINX
 #=================================================
-if [ "$mumbleweb" -eq 1 ] ; then
-	ynh_script_progression --message="Reloading NGINX web server..." --weight=2
+ynh_script_progression --message="Reloading NGINX web server..." --weight=2
 
-	ynh_systemd_action --service_name=nginx --action=reload
-fi
+ynh_systemd_action --service_name=nginx --action=reload
 
 #=================================================
 # SEND README TO ADMIN

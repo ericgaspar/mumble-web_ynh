@@ -5,7 +5,7 @@
 #=================================================
 
 # dependencies used by the app
-pkg_dependencies="mumble-server mailutils websockify"
+pkg_dependencies="websockify"
 
 # NodeJS version
 nodejs_version=12

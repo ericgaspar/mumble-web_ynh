@@ -1,7 +1,0 @@
-#!/bin/bash
-
-domain=$1
-app=$(basename "$0")
-app=${app#50-} # all hooks are nammed "50-$app".
-
-systemctl restart "$app"
